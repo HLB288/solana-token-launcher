@@ -1,0 +1,4 @@
+{
+  "/page": "app/page.js",
+  "/create-token/page": "app/create-token/page.js"
+}
