@@ -1,4 +1,4 @@
-// app/create-token/page.tsx (refactorisé)
+// app/create-token/page.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -13,6 +13,7 @@ export default function CreateToken() {
   const [mounted, setMounted] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
+  const [showForm, setShowForm] = useState(true); // État pour contrôler la visibilité du formulaire
   
   // Token Info
   const [name, setName] = useState('');
@@ -45,6 +46,7 @@ export default function CreateToken() {
     tokenAddress,
     txSignature,
     explorerLink,
+    metadataAddress,
     errorMessage,
     progressStage,
     progress
@@ -141,6 +143,49 @@ export default function CreateToken() {
     } else if (authorityType === 'update') {
       setCanUpdate(false);
     }
+  };
+
+  // Fonction pour réinitialiser le formulaire
+  const resetForm = () => {
+    // Cacher temporairement le formulaire pour reset l'état
+    setShowForm(false);
+    
+    // Réinitialiser tous les états du formulaire
+    setName('');
+    setSymbol('');
+    setDescription('');
+    setDecimals(9);
+    setTotalSupply(1000000);
+    setTokenImage(null);
+    setImagePreview(null);
+    
+    // Réinitialiser les autorités mais conserver le wallet actuel
+    if (publicKey) {
+      setMintAuthority(publicKey.toString());
+      setFreezeAuthority(publicKey.toString());
+    } else {
+      setMintAuthority('');
+      setFreezeAuthority('');
+    }
+    setCanMint(true);
+    setCanFreeze(true);
+    setCanUpdate(true);
+    
+    // Réinitialiser les informations sociales
+    setWebsite('');
+    setTwitter('');
+    setTelegram('');
+    setDiscord('');
+    
+    // Réinitialiser l'étape actuelle
+    setCurrentStep(1);
+    
+    // Petit délai pour assurer que tout est réinitialisé avant de réafficher
+    setTimeout(() => {
+      setShowForm(true);
+      // Forcer un rafraîchissement de la page pour réinitialiser également les états du hook
+      window.location.href = "/create-token";
+    }, 100);
   };
 
   // Calculer le temps estimé restant
@@ -459,201 +504,248 @@ export default function CreateToken() {
   };
 
   return (
-    <div className="form-container token-form">
-      {/* Éléments décoratifs */}
-      <div className="planet planet-1" style={{width: '50px', height: '50px', top: '-25px', right: '-25px'}}></div>
-      <div className="planet planet-2" style={{width: '40px', height: '40px', bottom: '-20px', left: '-20px'}}></div>
-      
-      <h2 className="form-title">Créer un nouveau Token</h2>
-      
-      {/* Stepper */}
-      <div className="form-stepper">
-        {Array.from({ length: totalSteps }).map((_, index) => (
-          <div
-            key={index}
-            className={`stepper-step ${currentStep > index + 1 ? 'completed' : ''} ${currentStep === index + 1 ? 'active' : ''}`}
-          >
-            <div className="step-circle">{index + 1}</div>
-            <div className="step-name">
-              {index === 0 ? 'Informations' : index === 1 ? 'Autorisations' : 'Social'}
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {/* Contenu de l'étape actuelle */}
-      <div className="step-content">
-        {renderStepContent()}
-      </div>
-      
-      {/* Navigation des étapes */}
-      <div className="step-navigation">
-        {currentStep > 1 && (
-          <button
-            type="button"
-            className="step-button prev"
-            onClick={prevStep}
-            disabled={isLoading}
-          >
-            Précédent
-          </button>
-        )}
-        
-        {currentStep < totalSteps ? (
-          <button
-            type="button"
-            className="step-button next"
-            onClick={nextStep}
-            disabled={isLoading || (currentStep === 1 && (!name || !symbol))}
-          >
-            Suivant
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="step-button create"
-            onClick={handleCreateToken}
-            disabled={isLoading || !name || !symbol || (mounted && !publicKey)}
-          >
-            {isLoading ? 'Création en cours...' : 'Créer le Token'}
-          </button>
-        )}
-      </div>
-      
-      {mounted && !publicKey && (
-        <div className="status-container error">
-          <h3 className="status-title">Wallet non connecté</h3>
-          <p>Veuillez connecter votre wallet pour créer un token</p>
-        </div>
-      )}
-      
-      {status === 'loading' && (
-        <div className="status-container loading">
-          <h3 className="status-title">Création du token en cours...</h3>
+    <>
+      {showForm && (
+        <div className="form-container token-form">
+          {/* Éléments décoratifs */}
+          <div className="planet planet-1" style={{width: '50px', height: '50px', top: '-25px', right: '-25px'}}></div>
+          <div className="planet planet-2" style={{width: '40px', height: '40px', bottom: '-20px', left: '-20px'}}></div>
           
-          <div className="progress-container">
-            <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{ width: `${(progressStage / (progress.length - 1)) * 100}%` }}
-              ></div>
-            </div>
-            
-            <div className="progress-stages">
-            {progress.map((stage, index) => (
-                <div 
-                  key={index} 
-                  className={`progress-stage ${index <= progressStage ? 'active' : ''}`}
-                >
-                  <div className="stage-indicator">{index + 1}</div>
-                  <div className="stage-label">{stage.label}</div>
+          <h2 className="form-title">Créer un nouveau Token</h2>
+          
+          {/* Stepper */}
+          <div className="form-stepper">
+            {Array.from({ length: totalSteps }).map((_, index) => (
+              <div
+                key={index}
+                className={`stepper-step ${currentStep > index + 1 ? 'completed' : ''} ${currentStep === index + 1 ? 'active' : ''}`}
+              >
+                <div className="step-circle">{index + 1}</div>
+                <div className="step-name">
+                  {index === 0 ? 'Informations' : index === 1 ? 'Autorisations' : 'Social'}
                 </div>
-              ))}
-            </div>
-            
-            <div className="current-stage-details">
-              <p className="stage-title">{progress[progressStage].label}</p>
-              <p className="stage-description">{progress[progressStage].description}</p>
-              <p className="estimated-time">Temps estimé: {estimatedTime} secondes</p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {status === 'success' && (
-        <div className="status-container success">
-          <h3 className="status-title">Token créé avec succès!</h3>
-          
-          <div className="token-info-grid">
-            <div className="token-info-item">
-              <span className="info-label">Nom</span>
-              <span className="info-value">{name}</span>
-            </div>
-            <div className="token-info-item">
-              <span className="info-label">Symbole</span>
-              <span className="info-value">{symbol}</span>
-            </div>
-            <div className="token-info-item">
-              <span className="info-label">Offre Totale</span>
-              <span className="info-value">{totalSupply.toLocaleString()}</span>
-            </div>
-            <div className="token-info-item">
-              <span className="info-label">Adresse</span>
-              <span className="info-value token-address">{tokenAddress}</span>
-            </div>
+              </div>
+            ))}
           </div>
           
-          <div className="token-actions">
-            <h4>Gérer votre token</h4>
+          {/* Contenu de l'étape actuelle */}
+          <div className="step-content">
+            {renderStepContent()}
+          </div>
+          
+          {/* Navigation des étapes */}
+          <div className="step-navigation">
+            {currentStep > 1 && (
+              <button
+                type="button"
+                className="step-button prev"
+                onClick={prevStep}
+                disabled={isLoading}
+              >
+                Précédent
+              </button>
+            )}
             
-            <div className="action-buttons">
-              {canMint && (
-                <button 
-                  className="action-button revoke-button"
-                  onClick={() => handleRevokeAuthority('mint')}
-                  disabled={isLoading}
-                >
-                  Révoquer Mint
-                </button>
-              )}
+            {currentStep < totalSteps ? (
+              <button
+                type="button"
+                className="step-button next"
+                onClick={nextStep}
+                disabled={isLoading || (currentStep === 1 && (!name || !symbol))}
+              >
+                Suivant
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="step-button create"
+                onClick={handleCreateToken}
+                disabled={isLoading || !name || !symbol || (mounted && !publicKey)}
+              >
+                {isLoading ? 'Création en cours...' : 'Créer le Token'}
+              </button>
+            )}
+          </div>
+          
+          {mounted && !publicKey && (
+            <div className="status-container error">
+              <h3 className="status-title">Wallet non connecté</h3>
+              <p>Veuillez connecter votre wallet pour créer un token</p>
+            </div>
+          )}
+          
+          {status === 'loading' && (
+            <div className="status-container loading">
+              <h3 className="status-title">Création du token en cours...</h3>
               
-              {canFreeze && (
-                <button 
-                  className="action-button revoke-button"
-                  onClick={() => handleRevokeAuthority('freeze')}
-                  disabled={isLoading}
-                >
-                  Révoquer Freeze
-                </button>
-              )}
-              
-              {canUpdate && (
-                <button 
-                  className="action-button revoke-button"
-                  onClick={() => handleRevokeAuthority('update')}
-                  disabled={isLoading}
-                >
-                  Révoquer Update
-                </button>
-              )}
+              <div className="progress-container">
+                <div className="progress-bar">
+                  <div 
+                    className="progress-fill" 
+                    style={{ width: `${(progressStage / (progress.length - 1)) * 100}%` }}
+                  ></div>
+                </div>
+                
+                <div className="progress-stages">
+                {progress.map((stage, index) => (
+                    <div 
+                      key={index} 
+                      className={`progress-stage ${index <= progressStage ? 'active' : ''}`}
+                    >
+                      <div className="stage-indicator">{index + 1}</div>
+                      <div className="stage-label">{stage.label}</div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="current-stage-details">
+                  <p className="stage-title">{progress[progressStage].label}</p>
+                  <p className="stage-description">{progress[progressStage].description}</p>
+                  <p className="estimated-time">Temps estimé: {estimatedTime} secondes</p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
           
-          <div className="token-links">
-            <a 
-              href={explorerLink || `https://explorer.solana.com/address/${tokenAddress}?cluster=devnet`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="status-link"
-            >
-              Voir le token sur Solana Explorer
-            </a>
-            
-            <a 
-              href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="status-link"
-            >
-              Voir la transaction sur Solana Explorer
-            </a>
-          </div>
+          {status === 'success' && (
+            <div className="status-container success">
+              <h3 className="status-title">Token créé avec succès!</h3>
+              
+              <div className="token-info-grid">
+                <div className="token-info-item">
+                  <span className="info-label">Nom</span>
+                  <span className="info-value">{name}</span>
+                </div>
+                <div className="token-info-item">
+                  <span className="info-label">Symbole</span>
+                  <span className="info-value">{symbol}</span>
+                </div>
+                <div className="token-info-item">
+                  <span className="info-label">Offre Totale</span>
+                  <span className="info-value">{totalSupply.toLocaleString()}</span>
+                </div>
+                <div className="token-info-item">
+                  <span className="info-label">Adresse</span>
+                  <span className="info-value token-address">{tokenAddress}</span>
+                </div>
+                
+                {/* Affichage des métadonnées */}
+                {metadataAddress && (
+                  <div className="token-info-item">
+                    <span className="info-label">Métadonnées</span>
+                    <span className="info-value token-address">{metadataAddress}</span>
+                  </div>
+                )}
+                
+                {description && (
+                  <div className="token-info-item full-width">
+                    <span className="info-label">Description</span>
+                    <span className="info-value description">{description}</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="token-actions">
+                <h4>Gérer votre token</h4>
+                
+                <div className="action-buttons">
+                  {canMint && (
+                    <button 
+                      className="action-button revoke-button"
+                      onClick={() => handleRevokeAuthority('mint')}
+                      disabled={isLoading}
+                    >
+                      Révoquer Mint
+                    </button>
+                  )}
+                  
+                  {canFreeze && (
+                    <button 
+                      className="action-button revoke-button"
+                      onClick={() => handleRevokeAuthority('freeze')}
+                      disabled={isLoading}
+                    >
+                      Révoquer Freeze
+                    </button>
+                  )}
+                  
+                  {canUpdate && (
+                    <button 
+                      className="action-button revoke-button"
+                      onClick={() => handleRevokeAuthority('update')}
+                      disabled={isLoading}
+                    >
+                      Révoquer Update
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="token-links">
+                <a 
+                  href={`https://explorer.solana.com/address/${tokenAddress}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="status-link"
+                >
+                  Voir le token sur Solana Explorer
+                </a>
+                
+                <a 
+                  href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="status-link"
+                >
+                  Voir la transaction sur Solana Explorer
+                </a>
+                
+                {metadataAddress && (
+                  <a 
+                    href={`https://explorer.solana.com/address/${metadataAddress}?cluster=devnet`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="status-link"
+                  >
+                    Voir les métadonnées sur Solana Explorer
+                  </a>
+                )}
+              </div>
+              
+              <div className="next-steps">
+                <h4>Prochaines étapes</h4>
+                <div className="next-steps-buttons">
+                  <Link href="/create-liquidity" className="next-step-button">
+                    Créer un Pool de Liquidité
+                  </Link>
+                  
+                  <button 
+                    onClick={resetForm} 
+                    className="next-step-button new-token-button"
+                  >
+                    Créer un nouveau token
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
-          <div className="next-steps">
-            <h4>Prochaines étapes</h4>
-            <Link href="/create-liquidity" className="next-step-button">
-              Créer un Pool de Liquidité
-            </Link>
-          </div>
+          {status === 'error' && (
+            <div className="status-container error">
+              <h3 className="status-title">Erreur lors de la création du token</h3>
+              <p>{errorMessage}</p>
+              
+              <button 
+                onClick={resetForm} 
+                className="next-step-button new-token-button"
+                style={{ marginTop: '1rem' }}
+              >
+                Réessayer
+              </button>
+            </div>
+          )}
         </div>
       )}
-      
-      {status === 'error' && (
-        <div className="status-container error">
-          <h3 className="status-title">Erreur lors de la création du token</h3>
-          <p>{errorMessage}</p>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
