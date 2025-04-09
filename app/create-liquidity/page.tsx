@@ -24,7 +24,7 @@ export default function CreateLiquidity() {
     progressStage,
     progress,
     estimatedTime
-  } = useCreateLiquidity({ network: 'devnet' }); // Changer en 'mainnet' pour la production
+  } = useCreateLiquidity({ network: 'mainnet' }); // Changer en 'mainnet' pour la production
 
   useEffect(() => {
     setMounted(true);
@@ -149,7 +149,7 @@ export default function CreateLiquidity() {
           <h3 className="status-title">Pool de liquidité créé avec succès!</h3>
           <p>Adresse du Pool: {poolAddress}</p>
           <a 
-            href={`https://explorer.solana.com/address/${poolAddress}?cluster=devnet`}
+            href={`https://explorer.solana.com/address/${poolAddress}?cluster=mainnet`}
             target="_blank"
             rel="noopener noreferrer"
             className="status-link"
@@ -158,7 +158,7 @@ export default function CreateLiquidity() {
           </a>
           <p>Signature de la transaction: </p>
           <a 
-            href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+            href={`https://explorer.solana.com/tx/${txSignature}?cluster=mainnet`}
             target="_blank"
             rel="noopener noreferrer"
             className="status-link"

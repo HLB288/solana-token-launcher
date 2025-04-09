@@ -13,7 +13,7 @@ import {
   export class LiquidityService {
     private network: 'mainnet' | 'devnet';
   
-    constructor(network: 'mainnet' | 'devnet' = 'devnet') {
+    constructor(network: 'mainnet' | 'devnet' = 'mainnet') {
       this.network = network;
     }
   

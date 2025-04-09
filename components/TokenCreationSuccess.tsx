@@ -91,7 +91,7 @@ const TokenCreationSuccess: React.FC<TokenCreationSuccessProps> = ({
       
       <div className="token-links">
         <a 
-          href={explorerLink ? explorerLink.replace('/tx/', '/address/') : `https://explorer.solana.com/address/${tokenAddress}?cluster=devnet`}
+          href={explorerLink ? explorerLink.replace('/tx/', '/address/') : `https://explorer.solana.com/address/${tokenAddress}?cluster=mainnet`}
           target="_blank"
           rel="noopener noreferrer"
           className="status-link"
@@ -100,7 +100,7 @@ const TokenCreationSuccess: React.FC<TokenCreationSuccessProps> = ({
         </a>
         
         <a 
-          href={explorerLink || `https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+          href={explorerLink || `https://explorer.solana.com/tx/${txSignature}?cluster=mainnet`}
           target="_blank"
           rel="noopener noreferrer"
           className="status-link"
@@ -110,7 +110,7 @@ const TokenCreationSuccess: React.FC<TokenCreationSuccessProps> = ({
         
         {metadataAddress && (
           <a 
-            href={`https://explorer.solana.com/address/${metadataAddress}?cluster=devnet`}
+            href={`https://explorer.solana.com/address/${metadataAddress}?cluster=mainnet`}
             target="_blank"
             rel="noopener noreferrer"
             className="status-link"

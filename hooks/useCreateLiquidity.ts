@@ -11,7 +11,7 @@ interface CreateLiquidityOptions {
 }
 
 export function useCreateLiquidity(options: CreateLiquidityOptions = {}) {
-  const { network = 'devnet' } = options;
+  const { network = 'mainnet' } = options;
   
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();

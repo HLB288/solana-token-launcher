@@ -13,6 +13,12 @@ const WalletMultiButtonDynamic = dynamic(
   { ssr: false }
 );
 
+// Import dynamique du composant de débogage
+const DebugConnectionDynamic = dynamic(
+  async () => (await import('../components/DebugConnection')),
+  { ssr: false }
+);
+
 export default function RootLayout({
   children,
 }: {
@@ -29,9 +35,7 @@ export default function RootLayout({
       <head>
         <title>Token Launcher</title>
         <meta name="description" content="Créez vos propres tokens sur la blockchain Solana" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        {/* Autres balises de tête */}
       </head>
       <body>
         <SolanaProvider>
@@ -52,6 +56,7 @@ export default function RootLayout({
               </div>
             </header>
             {children}
+            {mounted && <DebugConnectionDynamic />}
           </div>
         </SolanaProvider>
       </body>

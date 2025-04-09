@@ -8,7 +8,7 @@ import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 export class SolanaWalletAdapter {
   private connection: Connection;
   
-  constructor(network: 'mainnet' | 'devnet' = 'devnet') {
+  constructor(network: 'mainnet' | 'devnet' = 'mainnet') {
     // Initialiser la connexion au réseau Solana approprié
     const endpoint = network === 'mainnet' 
       ? 'https://api.mainnet-beta.solana.com' 

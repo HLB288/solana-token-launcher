@@ -13,3 +13,4 @@ target/
 crates.toml
 crates2.json
 .vscode/
+.env/

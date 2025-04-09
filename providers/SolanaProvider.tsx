@@ -1,12 +1,12 @@
 // providers/SolanaProvider.tsx
 'use client';
 
-import { FC, ReactNode, useMemo, useState, useEffect } from 'react';
+import { FC, ReactNode, useMemo } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { clusterApiUrl } from '@solana/web3.js';
+import { clusterApiUrl, Connection } from '@solana/web3.js';
 
 // Importez les styles du wallet adapter
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -16,28 +16,29 @@ interface SolanaProviderProps {
 }
 
 export const SolanaProvider: FC<SolanaProviderProps> = ({ children }) => {
-  const [mounted, setMounted] = useState(false);
+  // Forcer EXPLICITEMENT le mainnet
+  const network = WalletAdapterNetwork.Mainnet;
   
-  // Configurer explicitement pour le devnet
-  const network = WalletAdapterNetwork.Devnet;
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  // Utiliser un RPC public fiable ou votre propre RPC
+  const endpoint = useMemo(() => {
+    console.log("Initialisation SolanaProvider avec réseau mainnet via Helius");
+    return process.env.NEXT_PUBLIC_HELIUS_RPC_URL || clusterApiUrl('mainnet-beta');
+  }, []);
   
   // Initialiser les wallets disponibles
-  const wallets = useMemo(() => [
-    new PhantomWalletAdapter(),
-    new SolflareWalletAdapter(),
-  ], []);
-
-  // S'assurer que le provider n'essaie pas de s'initialiser côté serveur
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const wallets = useMemo(() => {
+    console.log("Initialisation des wallets pour le réseau:", network);
+    return [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+    ];
+  }, [network]);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
-          {mounted && children}
+          {children}
         </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
