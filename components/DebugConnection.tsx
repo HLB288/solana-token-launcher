@@ -10,8 +10,9 @@ export default function DebugConnection() {
   const [mounted, setMounted] = useState(false);
   const [mainnetBalance, setMainnetBalance] = useState<number | null>(null);
   const [connectionDetails, setConnectionDetails] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Assurez-vous que le composant n'est rendu que côté client
+  // Ensure the component is only rendered client-side
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -19,23 +20,52 @@ export default function DebugConnection() {
   useEffect(() => {
     if (!mounted || !publicKey) return;
     
-    // Vérifier le endpoint de connexion
+    // Check connection endpoint
     setConnectionDetails(`Endpoint: ${connection.rpcEndpoint}`);
     
-    // Vérifier le solde sur mainnet
+    // Check mainnet balance with fallbacks
     const checkMainnetBalance = async () => {
+      setIsLoading(true);
       try {
-        const mainnetConn = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
-        console.log("Tentative de récupération du solde pour:", publicKey.toString());
-        const balance = await mainnetConn.getBalance(publicKey);
-        console.log("Solde récupéré:", balance / LAMPORTS_PER_SOL, "SOL");
-        setMainnetBalance(balance / LAMPORTS_PER_SOL);
+        // List of fallback endpoints
+        const endpoints = [
+          connection.rpcEndpoint, // Try the current connection first
+          'https://api.mainnet-beta.solana.com',
+          'https://solana-mainnet.g.alchemy.com/v2/demo',
+          'https://solana-api.projectserum.com'
+        ];
+        
+        // Try each endpoint until one works
+        for (const endpoint of endpoints) {
+          try {
+            console.log(`Attempting to get balance using endpoint: ${endpoint}`);
+            const conn = new Connection(endpoint, 'confirmed');
+            const balance = await conn.getBalance(publicKey);
+            console.log(`Balance retrieved: ${balance / LAMPORTS_PER_SOL} SOL from ${endpoint}`);
+            setMainnetBalance(balance / LAMPORTS_PER_SOL);
+            setIsLoading(false);
+            return; // Exit the function if successful
+          } catch (endpointError) {
+            console.error(`Error with endpoint ${endpoint}:`, endpointError);
+            // Continue to next endpoint
+          }
+        }
+        
+        // If we get here, all endpoints failed
+        console.error('All endpoints failed to retrieve balance');
+        setIsLoading(false);
       } catch (err) {
-        console.error('Erreur mainnet:', err);
+        console.error('Error checking mainnet balance:', err);
+        setIsLoading(false);
       }
     };
     
     checkMainnetBalance();
+    
+    // Set up periodic balance checking
+    const intervalId = setInterval(checkMainnetBalance, 30000); // Every 30 seconds
+    
+    return () => clearInterval(intervalId);
   }, [publicKey, connection, mounted]);
 
   if (!mounted || !publicKey) {
@@ -55,9 +85,15 @@ export default function DebugConnection() {
       maxWidth: '300px',
       color: 'white'
     }}>
-      <div><strong>Adresse:</strong> {publicKey.toString()}</div>
-      <div><strong>Connexion:</strong> {connectionDetails}</div>
-      <div><strong>Solde Mainnet:</strong> {mainnetBalance !== null ? mainnetBalance.toFixed(6) : 'Chargement...'} SOL</div>
+      <div><strong>Address:</strong> {publicKey.toString()}</div>
+      <div><strong>Connection:</strong> {connectionDetails}</div>
+      <div>
+        <strong>Mainnet Balance:</strong> {isLoading 
+          ? 'Loading...' 
+          : mainnetBalance !== null 
+            ? mainnetBalance.toFixed(6) 
+            : 'Failed to load'} SOL
+      </div>
     </div>
   );
 }

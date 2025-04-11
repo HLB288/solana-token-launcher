@@ -1487,3 +1487,39 @@ input:checked + .toggle-slider:before {
   color: rgba(255, 255, 255, 0.7);
   font-style: italic;
 }
+
+.form-description {
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(20, 24, 40, 0.5);
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.token-details-preview {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(110, 84, 236, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #6e54ec;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.liquidity-info {
+  background: rgba(255, 123, 90, 0.1);
+  border-left: 4px solid #ff7b5a;
+  padding: 1rem;
+  border-radius: 0 8px 8px 0;
+  margin: 1.5rem 0;
+}
+
+.liquidity-info h4 {
+  margin-bottom: 0.5rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.liquidity-info p {
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+}

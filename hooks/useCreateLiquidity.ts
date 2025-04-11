@@ -1,8 +1,9 @@
-// hooks/useCreateLiquidity.ts
+// hooks/useCreateLiquidity.ts (improved)
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { LAMPORTS_PER_SOL, Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
 import { LiquidityService } from '../services/liquidity-service';
 import { SolanaWalletAdapter } from '../services/wallet-adapter';
 
@@ -23,22 +24,81 @@ export function useCreateLiquidity(options: CreateLiquidityOptions = {}) {
   const [errorMessage, setErrorMessage] = useState('');
   const [progressStage, setProgressStage] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState(15);
+  const [estimatedFees, setEstimatedFees] = useState<number>(0.005); // Default estimation
+  const [isFeeEstimating, setIsFeeEstimating] = useState<boolean>(false);
+  const [solBalance, setSolBalance] = useState<number>(0);
 
   // Services
   const liquidityService = new LiquidityService(network);
   const walletAdapter = new SolanaWalletAdapter(network);
 
-  // Étapes du processus
+  // Process steps
   const progress = [
-    { label: "Initialisation", description: "Préparation de la création du pool" },
-    { label: "Vérification du token", description: "Validation de l'adresse du token" },
-    { label: "Création du pool", description: "Création du pool de liquidité sur le DEX" },
-    { label: "Ajout de liquidité", description: "Transfert des tokens et SOL dans le pool" },
-    { label: "Finalisation", description: "Confirmation des transactions et finalisation" }
+    { label: "Initialization", description: "Preparing pool creation" },
+    { label: "Token Verification", description: "Validating token address" },
+    { label: "Pool Creation", description: "Creating liquidity pool on DEX" },
+    { label: "Adding Liquidity", description: "Transferring tokens and SOL into the pool" },
+    { label: "Finalization", description: "Confirming transactions and finalizing" }
   ];
   
+  // Get user's SOL balance on load
+  useEffect(() => {
+    if (publicKey) {
+      const fetchSolBalance = async () => {
+        try {
+          const mainnetConnection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
+          const balance = await mainnetConnection.getBalance(publicKey);
+          setSolBalance(balance / LAMPORTS_PER_SOL);
+        } catch (error) {
+          console.error("Error fetching SOL balance:", error);
+        }
+      };
+      
+      fetchSolBalance();
+      estimatePoolCreationFees();
+    }
+  }, [publicKey]);
+  
   /**
-   * Crée un pool de liquidité pour un token
+   * Checks if the balance is sufficient to cover fees
+   */
+  const isSolBalanceSufficient = (): boolean => {
+    return solBalance >= estimatedFees;
+  };
+  
+  /**
+   * Estimates the fees for creating a liquidity pool
+   */
+  const estimatePoolCreationFees = async () => {
+    setIsFeeEstimating(true);
+    // Set fixed fees for mainnet (could be calculated dynamically)
+    setEstimatedFees(network === 'mainnet' ? 0.005 : 0.001);
+    setIsFeeEstimating(false);
+  };
+  
+  /**
+   * Gets token details from its address
+   */
+  const getTokenDetails = async (tokenAddress: string) => {
+    try {
+      // Implement logic to retrieve token details
+      // Could use tokenService or query Solana API directly
+      
+      // For now, return dummy data
+      return {
+        name: "Token " + tokenAddress.substring(0, 6),
+        symbol: "TKN",
+        decimals: 9,
+        supply: 1000000
+      };
+    } catch (error) {
+      console.error("Error fetching token details:", error);
+      return null;
+    }
+  };
+
+  /**
+   * Creates a liquidity pool for a token
    */
   const createLiquidityPool = async (
     tokenAddress: string,
@@ -47,13 +107,22 @@ export function useCreateLiquidity(options: CreateLiquidityOptions = {}) {
   ) => {
     if (!publicKey || !sendTransaction) {
       setStatus('error');
-      setErrorMessage('Veuillez connecter votre wallet');
+      setErrorMessage('Please connect your wallet');
       return;
     }
 
     if (!tokenAddress) {
       setStatus('error');
-      setErrorMessage('Veuillez entrer l\'adresse du token');
+      setErrorMessage('Please enter the token address');
+      return;
+    }
+    
+    // Verify the address is valid
+    try {
+      new PublicKey(tokenAddress);
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage('Invalid token address');
       return;
     }
 
@@ -62,24 +131,21 @@ export function useCreateLiquidity(options: CreateLiquidityOptions = {}) {
     setProgressStage(0);
 
     try {
-      // NOTE: Pour une implémentation complète, vous devriez étudier 
-      // l'API et la documentation du DEX choisi (Jupiter, Raydium, etc.)
-      
-      // Étape 1: Initialisation
+      // Step 1: Initialization
       await new Promise(resolve => setTimeout(resolve, 1000));
       setProgressStage(1);
       
-      // Étape 2: Vérification du token
+      // Step 2: Token Verification
       await new Promise(resolve => setTimeout(resolve, 2000));
       setProgressStage(2);
       
-      // Créer une fonction pour signer et envoyer des transactions
+      // Create a function to sign and send transactions
       const signAndSendTransaction = walletAdapter.createSignAndSendTransactionFunction(
         publicKey,
         sendTransaction
       );
       
-      // Étape 3: Création du pool et ajout de liquidité
+      // Step 3: Create pool and add liquidity
       const result = await liquidityService.createLiquidityPool(
         tokenAddress,
         tokenAmount,
@@ -92,22 +158,29 @@ export function useCreateLiquidity(options: CreateLiquidityOptions = {}) {
       setTxSignature(result.txSignature);
       setProgressStage(3);
       
-      // Étape 4: Finalisation
+      // Step 4: Finalization
       await new Promise(resolve => setTimeout(resolve, 2000));
       setProgressStage(4);
       
+      // Update balance after creation
+      if (publicKey) {
+        const mainnetConnection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
+        const balance = await mainnetConnection.getBalance(publicKey);
+        setSolBalance(balance / LAMPORTS_PER_SOL);
+      }
+      
       setStatus('success');
     } catch (error) {
-      console.error("Erreur lors de la création du pool de liquidité:", error);
+      console.error("Error creating liquidity pool:", error);
       setStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : "Une erreur s'est produite");
+      setErrorMessage(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
   };
 
   /**
-   * Ajoute de la liquidité à un pool existant
+   * Adds liquidity to an existing pool
    */
   const addLiquidity = async (
     poolAddress: string,
@@ -116,20 +189,20 @@ export function useCreateLiquidity(options: CreateLiquidityOptions = {}) {
   ) => {
     if (!publicKey || !sendTransaction) {
       setStatus('error');
-      setErrorMessage('Veuillez connecter votre wallet');
+      setErrorMessage('Please connect your wallet');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Créer une fonction pour signer et envoyer des transactions
+      // Create a function to sign and send transactions
       const signAndSendTransaction = walletAdapter.createSignAndSendTransactionFunction(
         publicKey,
         sendTransaction
       );
       
-      // Appeler le service pour ajouter de la liquidité
+      // Call service to add liquidity
       const txSignature = await liquidityService.addLiquidity(
         poolAddress,
         tokenAmount,
@@ -138,11 +211,18 @@ export function useCreateLiquidity(options: CreateLiquidityOptions = {}) {
         signAndSendTransaction
       );
       
-      // Afficher un message de succès
-      alert(`Liquidité ajoutée avec succès!\nTx: ${txSignature}`);
+      // Update balance after transaction
+      if (publicKey) {
+        const mainnetConnection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
+        const balance = await mainnetConnection.getBalance(publicKey);
+        setSolBalance(balance / LAMPORTS_PER_SOL);
+      }
+      
+      // Show success message
+      alert(`Liquidity added successfully!\nTx: ${txSignature}`);
     } catch (error) {
-      console.error("Erreur lors de l'ajout de liquidité:", error);
-      setErrorMessage(error instanceof Error ? error.message : "Une erreur s'est produite");
+      console.error("Error adding liquidity:", error);
+      setErrorMessage(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -151,6 +231,7 @@ export function useCreateLiquidity(options: CreateLiquidityOptions = {}) {
   return {
     createLiquidityPool,
     addLiquidity,
+    getTokenDetails,
     isLoading,
     status,
     poolAddress,
@@ -158,6 +239,10 @@ export function useCreateLiquidity(options: CreateLiquidityOptions = {}) {
     errorMessage,
     progressStage,
     progress,
-    estimatedTime
+    estimatedTime,
+    solBalance,
+    estimatedFees,
+    isFeeEstimating,
+    isSolBalanceSufficient
   };
 }

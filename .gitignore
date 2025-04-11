@@ -1,12 +1,9 @@
-# Dossiers de build et de cache
 node_modules/
 target/
 .cache/
 **/cache/
 **/debug/
 **/incremental/
-
-# Fichiers spécifiques à l'environnement
 .bash_history
 .bash_logout
 .bashrc
@@ -14,3 +11,8 @@ crates.toml
 crates2.json
 .vscode/
 .env/
+.next/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

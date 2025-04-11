@@ -8,7 +8,7 @@ import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adap
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl, Connection } from '@solana/web3.js';
 
-// Importez les styles du wallet adapter
+// Import wallet adapter styles
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 interface SolanaProviderProps {
@@ -16,18 +16,24 @@ interface SolanaProviderProps {
 }
 
 export const SolanaProvider: FC<SolanaProviderProps> = ({ children }) => {
-  // Forcer EXPLICITEMENT le mainnet
+  // Force EXPLICITLY mainnet
   const network = WalletAdapterNetwork.Mainnet;
   
-  // Utiliser un RPC public fiable ou votre propre RPC
+  // Use a reliable public RPC or your own RPC
   const endpoint = useMemo(() => {
-    console.log("Initialisation SolanaProvider avec réseau mainnet via Helius");
-    return process.env.NEXT_PUBLIC_HELIUS_RPC_URL || clusterApiUrl('mainnet-beta');
+    console.log("Initializing SolanaProvider with mainnet network");
+    
+    // Try to use Helius first, then fall back to public endpoint
+    const heliusEndpoint = process.env.NEXT_PUBLIC_HELIUS_RPC_URL;
+    const publicEndpoint = clusterApiUrl('mainnet-beta');
+    
+    // Return Helius if available, otherwise use public endpoint
+    return heliusEndpoint || publicEndpoint;
   }, []);
   
-  // Initialiser les wallets disponibles
+  // Initialize available wallets
   const wallets = useMemo(() => {
-    console.log("Initialisation des wallets pour le réseau:", network);
+    console.log("Initializing wallets for network:", network);
     return [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),

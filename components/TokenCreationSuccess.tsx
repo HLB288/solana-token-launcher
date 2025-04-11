@@ -27,29 +27,29 @@ const TokenCreationSuccess: React.FC<TokenCreationSuccessProps> = ({
 }) => {
   return (
     <div className="status-container success">
-      <h3 className="status-title">Token créé avec succès!</h3>
+      <h3 className="status-title">Token created successfully!</h3>
       
       <div className="token-info-grid">
         <div className="token-info-item">
-          <span className="info-label">Nom</span>
+          <span className="info-label">Name</span>
           <span className="info-value">{name}</span>
         </div>
         <div className="token-info-item">
-          <span className="info-label">Symbole</span>
+          <span className="info-label">Symbol</span>
           <span className="info-value">{symbol}</span>
         </div>
         <div className="token-info-item">
-          <span className="info-label">Offre Totale</span>
+          <span className="info-label">Total Supply</span>
           <span className="info-value">{totalSupply.toLocaleString()}</span>
         </div>
         <div className="token-info-item">
-          <span className="info-label">Adresse</span>
+          <span className="info-label">Address</span>
           <span className="info-value token-address">{tokenAddress}</span>
         </div>
         
         {metadataAddress && (
           <div className="token-info-item">
-            <span className="info-label">Adresse des métadonnées</span>
+            <span className="info-label">Metadata Address</span>
             <span className="info-value token-address">{metadataAddress}</span>
           </div>
         )}
@@ -63,68 +63,77 @@ const TokenCreationSuccess: React.FC<TokenCreationSuccessProps> = ({
       </div>
       
       <div className="token-actions">
-        <h4>Gérer votre token</h4>
+        <h4>Manage your token</h4>
         
         <div className="action-buttons">
           <button 
             className="action-button revoke-button"
             onClick={() => revokeAuthority('mint')}
           >
-            Révoquer Mint
+            Revoke Mint
           </button>
           
           <button 
             className="action-button revoke-button"
             onClick={() => revokeAuthority('freeze')}
           >
-            Révoquer Freeze
+            Revoke Freeze
           </button>
           
           <button 
             className="action-button revoke-button"
             onClick={() => revokeAuthority('update')}
           >
-            Révoquer Update
+            Revoke Update
           </button>
         </div>
       </div>
       
       <div className="token-links">
         <a 
-          href={explorerLink ? explorerLink.replace('/tx/', '/address/') : `https://explorer.solana.com/address/${tokenAddress}?cluster=mainnet`}
+          href={explorerLink ? explorerLink.replace('/tx/', '/address/') : `https://explorer.solana.com/address/${tokenAddress}`}
           target="_blank"
           rel="noopener noreferrer"
           className="status-link"
         >
-          Voir le token sur Solana Explorer
+          View token on Solana Explorer
         </a>
         
         <a 
-          href={explorerLink || `https://explorer.solana.com/tx/${txSignature}?cluster=mainnet`}
+          href={explorerLink || `https://explorer.solana.com/tx/${txSignature}`}
           target="_blank"
           rel="noopener noreferrer"
           className="status-link"
         >
-          Voir la transaction sur Solana Explorer
+          View transaction on Solana Explorer
         </a>
         
         {metadataAddress && (
           <a 
-            href={`https://explorer.solana.com/address/${metadataAddress}?cluster=mainnet`}
+            href={`https://explorer.solana.com/address/${metadataAddress}`}
             target="_blank"
             rel="noopener noreferrer"
             className="status-link"
           >
-            Voir les métadonnées sur Solana Explorer
+            View metadata on Solana Explorer
           </a>
         )}
       </div>
       
       <div className="next-steps">
-        <h4>Prochaines étapes</h4>
-        <Link href="/create-liquidity" className="next-step-button">
-          Créer un Pool de Liquidité
-        </Link>
+        <h4>Next Steps</h4>
+        <div className="next-steps-buttons">
+          <Link href={`/create-liquidity?token=${tokenAddress}`} className="next-step-button">
+            Create Liquidity Pool
+          </Link>
+          
+          <button 
+            onClick={() => window.location.href = "/create-token"} 
+            className="next-step-button new-token-button"
+          >
+            Create a new token
+          </button>
+        </div>
       </div>
     </div>
   );
