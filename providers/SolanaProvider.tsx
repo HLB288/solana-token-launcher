@@ -19,16 +19,30 @@ export const SolanaProvider: FC<SolanaProviderProps> = ({ children }) => {
   // Force EXPLICITLY mainnet
   const network = WalletAdapterNetwork.Mainnet;
   
-  // Use a reliable public RPC or your own RPC
+  // Use a reliable public RPC or your own RPC with fallback mechanism
   const endpoint = useMemo(() => {
     console.log("Initializing SolanaProvider with mainnet network");
     
-    // Try to use Helius first, then fall back to public endpoint
-    const heliusEndpoint = process.env.NEXT_PUBLIC_HELIUS_RPC_URL;
-    const publicEndpoint = clusterApiUrl('mainnet-beta');
+    // Définir plusieurs endpoints comme fallback
+    const endpoints = [
+      process.env.NEXT_PUBLIC_HELIUS_RPC_URL,
+      'https://api.mainnet-beta.solana.com',
+      'https://solana-api.projectserum.com',
+      clusterApiUrl('mainnet-beta')
+    ].filter(Boolean) as string[]; // Filtrer les endpoints undefined
     
-    // Return Helius if available, otherwise use public endpoint
-    return heliusEndpoint || publicEndpoint;
+    // Retourner le premier endpoint (on pourra tester les autres si celui-ci échoue)
+    return endpoints[0];
+  }, []);
+  
+  // Liste des fallbacks pour utilisation dans d'autres composants
+  const fallbackEndpoints = useMemo(() => {
+    return [
+      process.env.NEXT_PUBLIC_HELIUS_RPC_URL, 
+      'https://api.mainnet-beta.solana.com',
+      'https://solana-api.projectserum.com',
+      clusterApiUrl('mainnet-beta')
+    ].filter(Boolean) as string[];
   }, []);
   
   // Initialize available wallets
@@ -49,4 +63,14 @@ export const SolanaProvider: FC<SolanaProviderProps> = ({ children }) => {
       </WalletProvider>
     </ConnectionProvider>
   );
+};
+
+// Exporter la liste des endpoints de fallback
+export const getFallbackEndpoints = () => {
+  return [
+    process.env.NEXT_PUBLIC_HELIUS_RPC_URL, 
+    'https://api.mainnet-beta.solana.com',
+    'https://solana-api.projectserum.com',
+    clusterApiUrl('mainnet-beta')
+  ].filter(Boolean) as string[];
 };

@@ -1,11 +1,11 @@
+// components/DebugConnection.tsx
 'use client';
 
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useEffect, useState } from 'react';
-import { LAMPORTS_PER_SOL, Connection, clusterApiUrl } from '@solana/web3.js';
+import { BalanceService } from '../services/balance-service';
 
 export default function DebugConnection() {
-  const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [mounted, setMounted] = useState(false);
   const [mainnetBalance, setMainnetBalance] = useState<number | null>(null);
@@ -20,39 +20,15 @@ export default function DebugConnection() {
   useEffect(() => {
     if (!mounted || !publicKey) return;
     
-    // Check connection endpoint
-    setConnectionDetails(`Endpoint: ${connection.rpcEndpoint}`);
+    // Set connection details
+    setConnectionDetails(`Endpoint: mainnet (multi-RPC fallback)`);
     
-    // Check mainnet balance with fallbacks
+    // Check mainnet balance with our balance service
     const checkMainnetBalance = async () => {
       setIsLoading(true);
       try {
-        // List of fallback endpoints
-        const endpoints = [
-          connection.rpcEndpoint, // Try the current connection first
-          'https://api.mainnet-beta.solana.com',
-          'https://solana-mainnet.g.alchemy.com/v2/demo',
-          'https://solana-api.projectserum.com'
-        ];
-        
-        // Try each endpoint until one works
-        for (const endpoint of endpoints) {
-          try {
-            console.log(`Attempting to get balance using endpoint: ${endpoint}`);
-            const conn = new Connection(endpoint, 'confirmed');
-            const balance = await conn.getBalance(publicKey);
-            console.log(`Balance retrieved: ${balance / LAMPORTS_PER_SOL} SOL from ${endpoint}`);
-            setMainnetBalance(balance / LAMPORTS_PER_SOL);
-            setIsLoading(false);
-            return; // Exit the function if successful
-          } catch (endpointError) {
-            console.error(`Error with endpoint ${endpoint}:`, endpointError);
-            // Continue to next endpoint
-          }
-        }
-        
-        // If we get here, all endpoints failed
-        console.error('All endpoints failed to retrieve balance');
+        const balance = await BalanceService.getBalance(publicKey);
+        setMainnetBalance(balance);
         setIsLoading(false);
       } catch (err) {
         console.error('Error checking mainnet balance:', err);
@@ -66,7 +42,7 @@ export default function DebugConnection() {
     const intervalId = setInterval(checkMainnetBalance, 30000); // Every 30 seconds
     
     return () => clearInterval(intervalId);
-  }, [publicKey, connection, mounted]);
+  }, [publicKey, mounted]);
 
   if (!mounted || !publicKey) {
     return null;
