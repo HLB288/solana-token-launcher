@@ -1,4 +1,3 @@
-// services/token-service.ts (avec support des métadonnées et ajustements pour mainnet)
 import { 
   Connection, 
   PublicKey, 
@@ -56,17 +55,59 @@ export interface TokenCreationResponse {
 export class TokenService {
   private network: 'mainnet' | 'devnet';
   private connection: Connection;
+  private standardConnection: Connection;
 
   constructor(network: 'mainnet' | 'devnet' = 'devnet') {
     this.network = 'mainnet'; // Force toujours mainnet
+    
+    // Endpoint de secours standard Solana
+    this.standardConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
     
     const endpoints = getFallbackEndpoints();
     const endpoint = endpoints[0];
     // Utiliser l'endpoint Helius depuis les variables d'environnement
     const heliusEndpoint = process.env.NEXT_PUBLIC_HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
     
-    this.connection = new Connection(heliusEndpoint, 'confirmed');
-    console.log("TokenService: Connexion établie via Helius RPC");
+    try {
+      this.connection = new Connection(heliusEndpoint, 'confirmed');
+      console.log("TokenService: Connexion établie via Helius RPC");
+    } catch (error) {
+      console.error("Erreur lors de l'initialisation de la connexion Helius, utilisation de l'API standard Solana:", error);
+      this.connection = this.standardConnection;
+    }
+  }
+
+  /**
+   * Méthode pour tester la connexion Helius
+   */
+  private async testHeliusConnection() {
+    try {
+      const response = await fetch(process.env.NEXT_PUBLIC_HELIUS_RPC_URL || '', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          "jsonrpc": "2.0",
+          "id": "1",
+          "method": "getLatestBlockhash",
+          "params": [
+            {
+              "commitment": "processed"
+            }
+          ]
+        })
+      });
+      
+      const data = await response.json();
+      if (!data.result || !data.result.value) {
+        throw new Error("Test de connexion Helius échoué: format de réponse inattendu");
+      }
+      console.log("Test Helius réussi");
+    } catch (error) {
+      console.error("Test de connexion Helius échoué:", error);
+      throw error;
+    }
   }
 
   /**
@@ -76,24 +117,79 @@ export class TokenService {
    */
   async estimateTransactionFees(instructions: TransactionInstruction[]): Promise<number> {
     try {
-      // Créer une transaction avec les instructions données
-      const transaction = new Transaction().add(...instructions);
+      const dummyPayer = Keypair.generate().publicKey;
+      const transaction = new Transaction();
+      transaction.add(...instructions);
       
-      // Récupérer le dernier blockhash
-      const { value: latestBlockhash } = await this.connection.getLatestBlockhash();
-      transaction.recentBlockhash = latestBlockhash.blockhash;
+      // Utiliser l'API JSON-RPC directe de Helius pour obtenir le dernier blockhash
+      try {
+        // Appel JSON-RPC direct à Helius
+        const heliusEndpoint = process.env.NEXT_PUBLIC_HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
+        console.log("Appel RPC Helius pour getLatestBlockhash...");
+        
+        const response = await fetch(heliusEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "getLatestBlockhash",
+            "params": [
+              {
+                "commitment": "processed"
+              }
+            ]
+          })
+        });
+        
+        const data = await response.json();
+        console.log("Réponse Helius getLatestBlockhash:", JSON.stringify(data, null, 2));
+        
+        if (data.result && data.result.value && data.result.value.blockhash) {
+          // Structure Helius correcte
+          transaction.recentBlockhash = data.result.value.blockhash;
+          console.log("Blockhash obtenu via Helius:", data.result.value.blockhash);
+        } else {
+          throw new Error("Format de réponse Helius inattendu");
+        }
+      } catch (heliusError) {
+        console.error("Erreur avec l'API Helius:", heliusError);
+        
+        // Fallback: utiliser l'API standard de Solana
+        try {
+          console.log("Utilisation du fallback Solana standard pour getLatestBlockhash");
+          const { blockhash } = await this.standardConnection.getLatestBlockhash();
+          transaction.recentBlockhash = blockhash;
+          console.log("Blockhash obtenu via API Solana standard:", blockhash);
+        } catch (fallbackError) {
+          console.error("Erreur avec le fallback:", fallbackError);
+          // Retourner une estimation par défaut
+          return this.network === 'mainnet' ? 20000 : 5000;
+        }
+      }
       
-      // Estimer les frais
-      const fees = await this.connection.getFeeForMessage(
-        transaction.compileMessage(),
-        'confirmed'
-      );
+      transaction.feePayer = dummyPayer;
       
-      return fees.value || 0;
+      // Tenter d'obtenir les frais de message
+      try {
+        // Utiliser la connexion standard pour l'estimation des frais
+        const fees = await this.standardConnection.getFeeForMessage(
+          transaction.compileMessage(),
+          'confirmed'
+        );
+        
+        const estimatedFees = fees.value || 15000;
+        console.log("Frais estimés:", estimatedFees, "lamports");
+        return estimatedFees;
+      } catch (feeError) {
+        console.error("Erreur lors de l'estimation des frais de message:", feeError);
+        return this.network === 'mainnet' ? 15000 : 5000;
+      }
     } catch (error) {
-      console.error("Erreur lors de l'estimation des frais:", error);
-      // Retourner une estimation par défaut plus élevée pour le mainnet
-      return this.network === 'mainnet' ? 15000 : 5000; // Valeurs en lamports
+      console.error("Erreur générale lors de l'estimation des frais:", error);
+      return this.network === 'mainnet' ? 15000 : 5000;
     }
   }
 
@@ -162,183 +258,6 @@ export class TokenService {
    * @param details Les détails du token à créer
    * @param wallet L'objet wallet qui contient le signataire
    */
-  // async createToken(
-  //   details: TokenDetails,
-  //   wallet: {
-  //     publicKey: PublicKey;
-  //     signTransaction: (transaction: Transaction) => Promise<Transaction>;
-  //   }
-  // ): Promise<TokenCreationResponse> {
-  //   try {
-  //     console.log("Creating token with wallet:", wallet.publicKey.toString());
-      
-  //     // Vérifier que l'utilisateur a suffisamment de SOL pour les frais
-  //     const estimatedFees = await this.estimateTokenCreationFees();
-  //     const userBalance = await this.connection.getBalance(wallet.publicKey);
-      
-  //     if (userBalance < estimatedFees) {
-  //       throw new Error(`Solde insuffisant pour couvrir les frais. Minimum recommandé: ${estimatedFees / LAMPORTS_PER_SOL} SOL`);
-  //     }
-      
-  //     // Vérifier la disponibilité du programme de métadonnées
-  //     const metadataProgramAvailable = await this.verifyMetadataProgramAvailability();
-      
-  //     // Générer un keypair pour le mint
-  //     const mintKeypair = Keypair.generate();
-  //     console.log("Generated mint keypair:", mintKeypair.publicKey.toString());
-      
-  //     // Calculer le loyer nécessaire pour le compte de mint
-  //     const rentExemptMint = await this.connection.getMinimumBalanceForRentExemption(
-  //       MINT_SIZE
-  //     );
-      
-  //     // Obtenir l'adresse du compte associé pour le wallet
-  //     const associatedTokenAddress = await getAssociatedTokenAddress(
-  //       mintKeypair.publicKey,
-  //       wallet.publicKey
-  //     );
-      
-  //     // Obtenir l'adresse PDA pour les métadonnées
-  //     let metadataPDA: PublicKey | null = null;
-  //     let metadataAddress: string | undefined = undefined;
-      
-  //     if (metadataProgramAvailable) {
-  //       [metadataPDA] = PublicKey.findProgramAddressSync(
-  //         [
-  //           Buffer.from("metadata"),
-  //           TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-  //           mintKeypair.publicKey.toBuffer(),
-  //         ],
-  //         TOKEN_METADATA_PROGRAM_ID
-  //       );
-        
-  //       console.log("Metadata PDA:", metadataPDA.toString());
-  //     }
-      
-  //     // Construire la transaction
-  //     const transaction = new Transaction();
-      
-  //     // Instruction 1: Créer le compte pour le mint
-  //     transaction.add(
-  //       SystemProgram.createAccount({
-  //         fromPubkey: wallet.publicKey,
-  //         newAccountPubkey: mintKeypair.publicKey,
-  //         space: MINT_SIZE,
-  //         lamports: rentExemptMint,
-  //         programId: TOKEN_PROGRAM_ID
-  //       })
-  //     );
-      
-  //     // Instruction 2: Initialiser le mint
-  //     transaction.add(
-  //       createInitializeMintInstruction(
-  //         mintKeypair.publicKey,  // Le mint
-  //         details.decimals,       // Décimales
-  //         wallet.publicKey,       // Mint authority
-  //         wallet.publicKey,       // Freeze authority
-  //         TOKEN_PROGRAM_ID
-  //       )
-  //     );
-      
-  //     // Instruction 3: Créer le compte associé pour le propriétaire
-  //     transaction.add(
-  //       createAssociatedTokenAccountInstruction(
-  //         wallet.publicKey,         // Payeur
-  //         associatedTokenAddress,   // Compte associé
-  //         wallet.publicKey,         // Propriétaire
-  //         mintKeypair.publicKey     // Mint
-  //       )
-  //     );
-      
-  //     // Instruction 4: Minter l'offre initiale
-  //     const mintAmount = details.totalSupply * Math.pow(10, details.decimals);
-  //     transaction.add(
-  //       createMintToInstruction(
-  //         mintKeypair.publicKey,     // Mint
-  //         associatedTokenAddress,    // Destination
-  //         wallet.publicKey,          // Autorité
-  //         BigInt(mintAmount)         // Montant (ajusté pour les décimales et converti en BigInt)
-  //       )
-  //     );
-      
-  //     // Instruction 5: Créer les métadonnées du token (si disponible)
-  //     if (metadataProgramAvailable && metadataPDA) {
-  //       // Préparer les données de métadonnées
-  //       const tokenMetadata = {
-  //         name: details.name,
-  //         symbol: details.symbol,
-  //         uri: metadataUrl, // URL des métadonnées JSON (peut être mise à jour plus tard)
-  //         sellerFeeBasisPoints: 0, // 0% de frais
-  //         creators: null,
-  //         collection: null,
-  //         uses: null
-  //       };
-        
-  //       // Ajouter l'instruction pour créer les métadonnées
-  //       transaction.add(
-  //         createCreateMetadataAccountV3Instruction(
-  //           {
-  //             metadata: metadataPDA,
-  //             mint: mintKeypair.publicKey,
-  //             mintAuthority: wallet.publicKey,
-  //             payer: wallet.publicKey,
-  //             updateAuthority: wallet.publicKey,
-  //           },
-  //           {
-  //             createMetadataAccountArgsV3: {
-  //               data: tokenMetadata,
-  //               isMutable: true,
-  //               collectionDetails: null,
-  //             },
-  //           }
-  //         )
-  //       );
-        
-  //       metadataAddress = metadataPDA.toString();
-  //     }
-      
-  //     // Signer avec le wallet
-  //     transaction.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
-  //     transaction.feePayer = wallet.publicKey;
-      
-  //     const signedTx = await wallet.signTransaction(transaction);
-      
-  //     // Ajouter la signature du mintKeypair
-  //     signedTx.partialSign(mintKeypair);
-      
-  //     // Envoyer la transaction signée
-  //     const rawTransaction = signedTx.serialize();
-  //     const txid = await this.connection.sendRawTransaction(rawTransaction, {
-  //       skipPreflight: false,
-  //       preflightCommitment: 'confirmed'
-  //     });
-      
-  //     // Attendre la confirmation avec un timeout plus long
-  //     const confirmation = await this.connection.confirmTransaction({
-  //       signature: txid,
-  //       blockhash: transaction.recentBlockhash,
-  //       lastValidBlockHeight: (await this.connection.getLatestBlockhash()).lastValidBlockHeight
-  //     }, 'confirmed');
-      
-  //     console.log("Transaction confirmed:", txid);
-      
-  //     // Construire le lien explorer
-  //     const explorerLink = this.getExplorerLink(txid);
-      
-  //     // Retourner les informations sur le token créé
-  //     return {
-  //       tokenAddress: mintKeypair.publicKey.toString(),
-  //       txSignature: txid,
-  //       explorerLink,
-  //       metadataAddress,
-  //       imageUrl,
-  //       metadataUrl
-  //     };
-  //   } catch (error) {
-  //     console.error("Erreur lors de la création du token:", error);
-  //     throw error;
-  //   }
-  // }
   async createToken(
     details: TokenDetails,
     wallet: {
@@ -506,8 +425,55 @@ export class TokenService {
         metadataAddress = metadataPDA.toString();
       }
       
-      // Signer avec le wallet
-      transaction.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
+      // Utiliser l'API JSON-RPC pour obtenir le blockhash
+      try {
+        // Appel JSON-RPC direct à Helius
+        const heliusEndpoint = process.env.NEXT_PUBLIC_HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
+        console.log("Appel RPC Helius pour getLatestBlockhash...");
+        
+        const response = await fetch(heliusEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "getLatestBlockhash",
+            "params": [
+              {
+                "commitment": "processed"
+              }
+            ]
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.result && data.result.value && data.result.value.blockhash) {
+          // Structure Helius correcte
+          transaction.recentBlockhash = data.result.value.blockhash;
+          transaction.lastValidBlockHeight = data.result.value.lastValidBlockHeight;
+          console.log("Blockhash obtenu via Helius:", data.result.value.blockhash);
+        } else {
+          throw new Error("Format de réponse Helius inattendu");
+        }
+      } catch (heliusError) {
+        console.error("Erreur avec l'API Helius pour obtenir le blockhash:", heliusError);
+        
+        // Fallback: utiliser l'API standard de Solana
+        try {
+          console.log("Utilisation du fallback Solana standard pour getLatestBlockhash");
+          const { blockhash, lastValidBlockHeight } = await this.standardConnection.getLatestBlockhash();
+          transaction.recentBlockhash = blockhash;
+          transaction.lastValidBlockHeight = lastValidBlockHeight;
+          console.log("Blockhash obtenu via API Solana standard:", blockhash);
+        } catch (fallbackError) {
+          console.error("Erreur avec le fallback pour obtenir le blockhash:", fallbackError);
+          throw new Error("Impossible d'obtenir un blockhash valide pour la transaction");
+        }
+      }
+      
       transaction.feePayer = wallet.publicKey;
       
       const signedTx = await wallet.signTransaction(transaction);
@@ -526,7 +492,7 @@ export class TokenService {
       const confirmation = await this.connection.confirmTransaction({
         signature: txid,
         blockhash: transaction.recentBlockhash,
-        lastValidBlockHeight: (await this.connection.getLatestBlockhash()).lastValidBlockHeight
+        lastValidBlockHeight: transaction.lastValidBlockHeight
       }, 'confirmed');
       
       console.log("Transaction confirmed:", txid);
@@ -612,8 +578,44 @@ export class TokenService {
         )
       );
       
-      // Signer et envoyer la transaction
-      transaction.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
+      // Utiliser l'API JSON-RPC pour obtenir le blockhash
+      try {
+        // Appel JSON-RPC direct à Helius
+        const heliusEndpoint = process.env.NEXT_PUBLIC_HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
+        
+        const response = await fetch(heliusEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "getLatestBlockhash",
+            "params": [
+              {
+                "commitment": "processed"
+              }
+            ]
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.result && data.result.value && data.result.value.blockhash) {
+          // Structure Helius correcte
+          transaction.recentBlockhash = data.result.value.blockhash;
+        } else {
+          throw new Error("Format de réponse Helius inattendu");
+        }
+      } catch (heliusError) {
+        console.error("Erreur avec l'API Helius:", heliusError);
+        
+        // Fallback: utiliser l'API standard de Solana
+        const { blockhash } = await this.standardConnection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+      }
+      
       transaction.feePayer = wallet.publicKey;
       
       const signedTx = await wallet.signTransaction(transaction);
@@ -693,8 +695,44 @@ export class TokenService {
         throw new Error(`Solde insuffisant pour couvrir les frais. Minimum recommandé: ${requiredBalance / LAMPORTS_PER_SOL} SOL`);
       }
       
-      // Ajouter le blockhash et le payeur
-      transaction.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
+      // Utiliser l'API JSON-RPC pour obtenir le blockhash
+      try {
+        // Appel JSON-RPC direct à Helius
+        const heliusEndpoint = process.env.NEXT_PUBLIC_HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
+        
+        const response = await fetch(heliusEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "getLatestBlockhash",
+            "params": [
+              {
+                "commitment": "processed"
+              }
+            ]
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.result && data.result.value && data.result.value.blockhash) {
+          // Structure Helius correcte
+          transaction.recentBlockhash = data.result.value.blockhash;
+        } else {
+          throw new Error("Format de réponse Helius inattendu");
+        }
+      } catch (heliusError) {
+        console.error("Erreur avec l'API Helius:", heliusError);
+        
+        // Fallback: utiliser l'API standard de Solana
+        const { blockhash } = await this.standardConnection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+      }
+      
       transaction.feePayer = wallet.publicKey;
       
       // Signer avec le wallet
